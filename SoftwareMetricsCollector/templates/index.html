@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-gray-800">System Monitoring Dashboard</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- CPU Usage Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">CPU Usage</h2>
+                <canvas id="cpuChart"></canvas>
+            </div>
+
+            <!-- Memory Usage Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Memory Usage</h2>
+                <canvas id="memoryChart"></canvas>
+            </div>
+
+            <!-- Bitcoin Price Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Bitcoin Price (USDT)</h2>
+                <canvas id="cryptoChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Utility functions
+        function createChart(ctx, label) {
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(chart, newData) {
+            const MAX_POINTS = 20;
+            
+            chart.data.labels.push(new Date().toLocaleTimeString());
+            chart.data.datasets[0].data.push(newData);
+
+            if (chart.data.labels.length > MAX_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            chart.update();
+        }
+
+        // Initialize charts
+        const cpuChart = createChart(document.getElementById('cpuChart').getContext('2d'), 'CPU Usage %');
+        const memoryChart = createChart(document.getElementById('memoryChart').getContext('2d'), 'Memory Usage %');
+        const cryptoChart = createChart(document.getElementById('cryptoChart').getContext('2d'), 'BTC/USDT $');
+
+        // Fetch and update data
+        async function fetchMetrics(deviceName, metricName) {
+            try {
+                const response = await fetch(`/api/metrics/${deviceName}/${metricName}`);
+                const data = await response.json();
+                return data[0]?.value ?? null;
+            } catch (error) {
+                console.error(`Error fetching ${metricName}:`, error);
+                return null;
+            }
+        }
+
+        async function updateMetrics() {
+            // Update CPU Usage
+            const cpuUsage = await fetchMetrics('Device_1', 'CPU_Usage');
+            if (cpuUsage !== null) updateChart(cpuChart, cpuUsage);
+
+            // Update Memory Usage
+            const memoryUsage = await fetchMetrics('Device_1', 'Memory_Usage');
+            if (memoryUsage !== null) updateChart(memoryChart, memoryUsage);
+
+            // Update Bitcoin Price
+            const cryptoPrice = await fetchMetrics('Device_2', 'BTC_Price');
+            if (cryptoPrice !== null) updateChart(cryptoChart, cryptoPrice);
+        }
+
+        // Update metrics every 5 seconds
+        setInterval(updateMetrics, 5000);
+        updateMetrics(); // Initial update
+    </script>
+</body>
+</html> 

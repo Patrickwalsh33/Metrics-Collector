@@ -1,0 +1,107 @@
+import psutil
+import time
+import requests
+from datetime import datetime
+import json
+import threading
+from queue import Queue
+
+class PCCollector:
+    def get_cpu_usage(self):
+        return psutil.cpu_percent(interval=1)
+    
+    def get_memory_usage(self):
+        return psutil.virtual_memory().percent
+
+class ThirdPartyCollector:
+    def __init__(self):
+        self.base_url = "https://api.binance.com/api/v3"
+        self.last_request_time = 0
+        self.min_interval = 5  # Binance allows more frequent requests
+
+    def get_crypto_price(self, symbol='BTCUSDT'):
+        current_time = time.time()
+        if current_time - self.last_request_time < self.min_interval:
+            return None
+        
+        try:
+            response = requests.get(f"{self.base_url}/ticker/price", params={"symbol": symbol})
+            if response.status_code == 200:
+                self.last_request_time = current_time
+                return float(response.json()['price'])
+            else:
+                print(f"Error fetching crypto price: {response.text}")
+                return None
+        except Exception as e:
+            print(f"Error fetching crypto price: {str(e)}")
+            return None
+
+class UploaderQueue:
+    def __init__(self, api_url='http://localhost:5000/api/metrics'):
+        self.queue = Queue()
+        self.api_url = api_url
+        self.running = True
+        self.upload_thread = threading.Thread(target=self._upload_worker)
+        self.upload_thread.daemon = True
+        self.upload_thread.start()
+
+    def add_metric(self, device_name, metric_name, value):
+        if value is not None:  # Only queue metrics with valid values
+            metric_data = {
+                'device_name': device_name,
+                'metric_name': metric_name,
+                'value': value,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            self.queue.put(metric_data)
+
+    def _upload_worker(self):
+        while self.running:
+            try:
+                if not self.queue.empty():
+                    metric_data = self.queue.get()
+                    try:
+                        response = requests.post(self.api_url, json=metric_data)
+                        if response.status_code != 200:
+                            print(f"Failed to upload metric: {response.text}")
+                    except requests.exceptions.ConnectionError:
+                        print("Connection to Flask server failed - ensure app.py is running")
+                        # Put the metric back in the queue
+                        self.queue.put(metric_data)
+                        # Wait before retrying
+                        time.sleep(5)
+                time.sleep(0.1)
+            except Exception as e:
+                print(f"Error in upload worker: {str(e)}")
+                time.sleep(1)
+
+def main():
+    print("Starting collectors...")
+    pc_collector = PCCollector()
+    third_party_collector = ThirdPartyCollector()
+    uploader = UploaderQueue()
+
+    print("Collecting metrics. Press Ctrl+C to stop.")
+    try:
+        while True:
+            # Collect PC metrics
+            cpu_usage = pc_collector.get_cpu_usage()
+            memory_usage = pc_collector.get_memory_usage()
+            
+            # Collect third-party metric (BTC price)
+            crypto_price = third_party_collector.get_crypto_price()
+
+            # Upload metrics
+            uploader.add_metric('Device_1', 'CPU_Usage', cpu_usage)
+            uploader.add_metric('Device_1', 'Memory_Usage', memory_usage)
+            if crypto_price:
+                uploader.add_metric('Device_2', 'BTC_Price', crypto_price)
+
+            time.sleep(5)  # Collect metrics every 5 seconds
+    except KeyboardInterrupt:
+        print("\nStopping collectors...")
+        uploader.running = False
+        print("Collectors stopped.")
+
+if __name__ == '__main__':
+    main() 
