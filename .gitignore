@@ -55,6 +55,36 @@ venv/
 ENV/
 .env
 .venv
+.venv_new
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Flask instance folder
+instance/
+**/instance/
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.env
+.venv
+.venv_new
 pip-log.txt
 pip-delete-this-directory.txt
 .tox/
