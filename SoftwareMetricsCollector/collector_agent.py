@@ -7,11 +7,18 @@ import threading
 from queue import Queue
 
 class PCCollector:
-    def get_cpu_usage(self):
-        return psutil.cpu_percent(interval=1)
+    def get_process_count(self):
+        return len(psutil.pids())
     
-    def get_memory_usage(self):
-        return psutil.virtual_memory().percent
+    def get_cpu_frequency(self):
+        try:
+            # Get current CPU frequency in MHz
+            freq = psutil.cpu_freq()
+            if freq:
+                return freq.current
+            return None
+        except:
+            return None
 
 class ThirdPartyCollector:
     def __init__(self):
@@ -85,15 +92,16 @@ def main():
     try:
         while True:
             # Collect PC metrics
-            cpu_usage = pc_collector.get_cpu_usage()
-            memory_usage = pc_collector.get_memory_usage()
+            process_count = pc_collector.get_process_count()
+            cpu_freq = pc_collector.get_cpu_frequency()
             
             # Collect third-party metric (BTC price)
             crypto_price = third_party_collector.get_crypto_price()
 
             # Upload metrics
-            uploader.add_metric('Device_1', 'CPU_Usage', cpu_usage)
-            uploader.add_metric('Device_1', 'Memory_Usage', memory_usage)
+            uploader.add_metric('Device_1', 'Process_Count', process_count)
+            if cpu_freq is not None:
+                uploader.add_metric('Device_1', 'CPU_Frequency', cpu_freq)
             if crypto_price:
                 uploader.add_metric('Device_2', 'BTC_Price', crypto_price)
 

@@ -12,16 +12,16 @@
         <h1 class="text-3xl font-bold mb-8 text-gray-800">System Monitoring Dashboard</h1>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- CPU Usage Card -->
+            <!-- Process Count Card -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-semibold mb-4">CPU Usage</h2>
-                <canvas id="cpuChart"></canvas>
+                <h2 class="text-xl font-semibold mb-4">Process Count</h2>
+                <canvas id="processChart"></canvas>
             </div>
 
-            <!-- Memory Usage Card -->
+            <!-- CPU Frequency Card -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-xl font-semibold mb-4">Memory Usage</h2>
-                <canvas id="memoryChart"></canvas>
+                <h2 class="text-xl font-semibold mb-4">CPU Frequency</h2>
+                <canvas id="freqChart"></canvas>
             </div>
 
             <!-- Bitcoin Price Card -->
@@ -72,8 +72,8 @@
         }
 
         // Initialize charts
-        const cpuChart = createChart(document.getElementById('cpuChart').getContext('2d'), 'CPU Usage %');
-        const memoryChart = createChart(document.getElementById('memoryChart').getContext('2d'), 'Memory Usage %');
+        const processChart = createChart(document.getElementById('processChart').getContext('2d'), 'Number of Processes');
+        const freqChart = createChart(document.getElementById('freqChart').getContext('2d'), 'Frequency (MHz)');
         const cryptoChart = createChart(document.getElementById('cryptoChart').getContext('2d'), 'BTC/USDT $');
 
         // Fetch and update data
@@ -89,13 +89,13 @@
         }
 
         async function updateMetrics() {
-            // Update CPU Usage
-            const cpuUsage = await fetchMetrics('Device_1', 'CPU_Usage');
-            if (cpuUsage !== null) updateChart(cpuChart, cpuUsage);
+            // Update Process Count
+            const processCount = await fetchMetrics('Device_1', 'Process_Count');
+            if (processCount !== null) updateChart(processChart, processCount);
 
-            // Update Memory Usage
-            const memoryUsage = await fetchMetrics('Device_1', 'Memory_Usage');
-            if (memoryUsage !== null) updateChart(memoryChart, memoryUsage);
+            // Update CPU Frequency
+            const cpuFreq = await fetchMetrics('Device_1', 'CPU_Frequency');
+            if (cpuFreq !== null) updateChart(freqChart, cpuFreq);
 
             // Update Bitcoin Price
             const cryptoPrice = await fetchMetrics('Device_2', 'BTC_Price');
