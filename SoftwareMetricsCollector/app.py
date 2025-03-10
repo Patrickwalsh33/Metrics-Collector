@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from models import db, Metric
+from models import db, Device, Metric, MetricData
 import os
 
 app = Flask(__name__)
@@ -21,35 +21,57 @@ with app.app_context():
 @app.route('/api/metrics', methods=['POST'])
 def add_metric():
     data = request.json
-    new_metric = Metric(
-        device_name=data['device_name'],
-        metric_name=data['metric_name'],
+    
+    # Get or create device
+    device = Device.query.filter_by(name=data['device_name']).first()
+    if not device:
+        device = Device(name=data['device_name'])
+        db.session.add(device)
+        db.session.flush()  # This will assign an ID to the device
+    
+    # Get or create metric type
+    metric = Metric.query.filter_by(name=data['metric_name']).first()
+    if not metric:
+        # Determine unit based on metric name
+        unit = {
+            'CPU_Usage': '%',
+            'Memory_Usage': '%',
+            'BTC_Price': 'USD'
+        }.get(data['metric_name'], 'unknown')
+        metric = Metric(name=data['metric_name'], unit=unit)
+        db.session.add(metric)
+        db.session.flush()  # This will assign an ID to the metric
+    
+    # Create new metric data
+    new_metric_data = MetricData(
+        metricID=metric.id,
+        deviceId=device.id,
         value=data['value']
     )
-    db.session.add(new_metric)
+    db.session.add(new_metric_data)
     db.session.commit()
     return jsonify({'status': 'success'})
 
 # Reporting API endpoints
 @app.route('/api/metrics/<device_name>/<metric_name>')
 def get_metrics(device_name, metric_name):
-    metrics = Metric.query.filter_by(
-        device_name=device_name,
-        metric_name=metric_name
-    ).order_by(Metric.timestamp.desc()).limit(100).all()
+    metrics = MetricData.query.join(Device).join(Metric).filter(
+        Device.name == device_name,
+        Metric.name == metric_name
+    ).order_by(MetricData.timestamp.desc()).limit(100).all()
     return jsonify([metric.to_dict() for metric in metrics])
 
 @app.route('/api/devices')
 def get_devices():
-    devices = db.session.query(Metric.device_name).distinct().all()
-    return jsonify([device[0] for device in devices])
+    devices = Device.query.all()
+    return jsonify([device.name for device in devices])
 
 @app.route('/api/metrics/device/<device_name>')
 def get_device_metrics(device_name):
-    metrics = db.session.query(Metric.metric_name).filter_by(
-        device_name=device_name
+    metrics = Metric.query.join(MetricData).join(Device).filter(
+        Device.name == device_name
     ).distinct().all()
-    return jsonify([metric[0] for metric in metrics])
+    return jsonify([metric.name for metric in metrics])
 
 # Frontend routes
 @app.route('/')
