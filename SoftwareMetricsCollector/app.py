@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from models import db, Device, Metric, MetricData
 import os
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
@@ -55,10 +56,34 @@ def add_metric():
 # Reporting API endpoints
 @app.route('/api/metrics/<device_name>/<metric_name>')
 def get_metrics(device_name, metric_name):
-    metrics = MetricData.query.join(Device).join(Metric).filter(
+    # Get query parameters for time range
+    time_range = request.args.get('time_range', '10min')  # Default to 10 minutes
+    limit = int(request.args.get('limit', 100))  # Default to 100 points
+    
+    query = MetricData.query.join(Device).join(Metric).filter(
         Device.name == device_name,
         Metric.name == metric_name
-    ).order_by(MetricData.timestamp.desc()).limit(100).all()
+    )
+    
+    # Calculate the time threshold based on the selected window
+    now = datetime.utcnow()
+    if time_range == '10min':
+        threshold = now - timedelta(minutes=10)
+    elif time_range == '30min':
+        threshold = now - timedelta(minutes=30)
+    elif time_range == '1hour':
+        threshold = now - timedelta(hours=1)
+    elif time_range == '1day':
+        threshold = now - timedelta(days=1)
+    else:
+        # Default to 10 minutes if invalid time range
+        threshold = now - timedelta(minutes=10)
+    
+    # Filter by time threshold and order by timestamp in ascending order (oldest to newest)
+    metrics = query.filter(
+        MetricData.timestamp >= threshold
+    ).order_by(MetricData.timestamp.asc()).limit(limit).all()
+    
     return jsonify([metric.to_dict() for metric in metrics])
 
 @app.route('/api/devices')
