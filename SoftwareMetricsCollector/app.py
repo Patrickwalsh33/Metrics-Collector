@@ -1,8 +1,15 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from models import db, Device, Metric, MetricData
 import os
 from datetime import datetime, timedelta
+import subprocess
+import signal
+import psutil
+import queue
+import threading
+import time
+import json
 
 app = Flask(__name__)
 CORS(app)
@@ -17,6 +24,85 @@ db.init_app(app)
 # Create database tables
 with app.app_context():
     db.create_all()
+
+# Global variables for collector management
+collector_process = None
+collector_status = queue.Queue()
+
+def find_python_executable():
+    if os.name == 'nt':  # Windows
+        return 'python'
+    return 'python3'  # Unix-like systems
+
+@app.route('/api/collector/start', methods=['POST'])
+def start_collector():
+    global collector_process
+    
+    if collector_process is not None:
+        return jsonify({'status': 'error', 'message': 'Collector is already running'})
+    
+    try:
+        python_exe = find_python_executable()
+        collector_process = subprocess.Popen([python_exe, 'collector_agent.py'])
+        collector_status.put(('running', datetime.utcnow()))
+        return jsonify({'status': 'success', 'message': 'Collector started'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/api/collector/stop', methods=['POST'])
+def stop_collector():
+    global collector_process
+    
+    if collector_process is None:
+        return jsonify({'status': 'error', 'message': 'Collector is not running'})
+    
+    try:
+        if os.name == 'nt':  # Windows
+            collector_process.terminate()
+        else:  # Unix-like systems
+            collector_process.send_signal(signal.SIGTERM)
+        
+        collector_process.wait(timeout=5)  # Wait for process to terminate
+        collector_process = None
+        collector_status.put(('stopped', datetime.utcnow()))
+        return jsonify({'status': 'success', 'message': 'Collector stopped'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/events')
+def events():
+    def generate():
+        global collector_process
+        while True:
+            try:
+                # Check collector status
+                if collector_process is not None:
+                    if collector_process.poll() is not None:  # Process has terminated
+                        collector_process = None
+                        collector_status.put(('stopped', datetime.utcnow()))
+                
+                # Send current status
+                status = 'running' if collector_process is not None else 'stopped'
+                data = {'type': 'collector_status', 'status': status}
+                yield f"data: {json.dumps(data)}\n\n"
+                
+                # Check for status updates
+                try:
+                    new_status, timestamp = collector_status.get_nowait()
+                    data = {'type': 'collector_status', 'status': new_status}
+                    yield f"data: {json.dumps(data)}\n\n"
+                except queue.Empty:
+                    pass
+
+                # Add a small delay to prevent excessive CPU usage
+                time.sleep(1)
+            except GeneratorExit:
+                break
+            except Exception as e:
+                print(f"Error in SSE: {str(e)}")
+                time.sleep(1)
+
+    return Response(generate(), mimetype='text/event-stream')
 
 # Aggregator API endpoint
 @app.route('/api/metrics', methods=['POST'])
