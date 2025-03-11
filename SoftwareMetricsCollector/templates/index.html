@@ -18,26 +18,38 @@
             </div>
         </div>
 
-        <!-- Process Count Graph -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">Process Count</h2>
-            <div class="h-[300px]">
-                <canvas id="processCountChart"></canvas>
+        <!-- Top Row: Process Count and CPU Frequency Side by Side -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- Process Count Graph -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">Process Count</h2>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">Device_1</span>
+                </div>
+                <div class="h-[400px]">
+                    <canvas id="processCountChart"></canvas>
+                </div>
+            </div>
+
+            <!-- CPU Frequency Graph -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">CPU Frequency</h2>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">Device_1</span>
+                </div>
+                <div class="h-[400px]">
+                    <canvas id="cpuFrequencyChart"></canvas>
+                </div>
             </div>
         </div>
 
-        <!-- CPU Frequency Graph -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">CPU Frequency</h2>
-            <div class="h-[300px]">
-                <canvas id="cpuFrequencyChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Bitcoin Price Graph -->
+        <!-- Bottom Row: Bitcoin Price -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-            <h2 class="text-xl font-semibold mb-4">Bitcoin Price</h2>
-            <div class="h-[300px]">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-800">Bitcoin Price</h2>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Device_2</span>
+            </div>
+            <div class="h-[400px]">
                 <canvas id="btcPriceChart"></canvas>
             </div>
         </div>
