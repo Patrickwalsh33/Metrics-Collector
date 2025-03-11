@@ -17,82 +17,46 @@
                 <span id="lastUpdate" class="text-sm text-gray-600">No data available</span>
             </div>
         </div>
-        
-        <div class="space-y-8">
-            <!-- Process Count Card -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold text-gray-700">Process Count</h2>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Show last:</span>
-                        <select id="processTimeWindow" class="px-3 py-1 border rounded-md text-sm">
-                            <option value="10min">10 minutes</option>
-                            <option value="30min">30 minutes</option>
-                            <option value="1hour">1 hour</option>
-                            <option value="1day">24 hours</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="h-96">
-                    <canvas id="processChart"></canvas>
-                </div>
-            </div>
 
-            <!-- CPU Frequency Card -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold text-gray-700">CPU Frequency</h2>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Show last:</span>
-                        <select id="freqTimeWindow" class="px-3 py-1 border rounded-md text-sm">
-                            <option value="10min">10 minutes</option>
-                            <option value="30min">30 minutes</option>
-                            <option value="1hour">1 hour</option>
-                            <option value="1day">24 hours</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="h-96">
-                    <canvas id="freqChart"></canvas>
-                </div>
+        <!-- Process Count Graph -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Process Count</h2>
+            <div class="h-[300px]">
+                <canvas id="processCountChart"></canvas>
             </div>
+        </div>
 
-            <!-- Bitcoin Price Card -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold text-gray-700">Bitcoin Price (USDT)</h2>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Show last:</span>
-                        <select id="cryptoTimeWindow" class="px-3 py-1 border rounded-md text-sm">
-                            <option value="10min">10 minutes</option>
-                            <option value="30min">30 minutes</option>
-                            <option value="1hour">1 hour</option>
-                            <option value="1day">24 hours</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="h-96">
-                    <canvas id="cryptoChart"></canvas>
-                </div>
+        <!-- CPU Frequency Graph -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">CPU Frequency</h2>
+            <div class="h-[300px]">
+                <canvas id="cpuFrequencyChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Bitcoin Price Graph -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Bitcoin Price</h2>
+            <div class="h-[300px]">
+                <canvas id="btcPriceChart"></canvas>
             </div>
         </div>
     </div>
 
     <script>
         // Utility functions
-        function createChart(ctx, label, options = {}) {
+        function createChart(ctx, options = {}) {
             const defaultOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: false,  // Don't start from 0 for any metric
+                        beginAtZero: false,
                         grid: {
                             color: 'rgba(0, 0, 0, 0.1)'
                         },
                         ticks: {
                             callback: function(value) {
-                                // Format numbers with appropriate precision
                                 if (value >= 1000000) {
                                     return (value / 1000000).toFixed(1) + 'M';
                                 } else if (value >= 1000) {
@@ -129,7 +93,6 @@
                 }
             };
 
-            // Merge default options with provided options
             const mergedOptions = {
                 ...defaultOptions,
                 scales: {
@@ -142,38 +105,24 @@
                 type: 'line',
                 data: {
                     datasets: [{
-                        label: label,
+                        label: '',
                         data: [],
                         borderColor: 'rgb(75, 192, 192)',
                         backgroundColor: 'rgba(75, 192, 192, 0.1)',
                         tension: 0.4,
                         fill: true,
-                        spanGaps: false  // Don't connect across missing data points
+                        spanGaps: false
                     }]
                 },
                 options: mergedOptions
             });
         }
 
-        function updateChart(chart, data, timeWindow) {
+        function updateChart(chart, data) {
             if (data && data.length > 0) {
-                // Calculate the time range based on the selected window
+                // Calculate the time range for the last 10 minutes
                 const now = new Date();
-                let startTime;
-                switch(timeWindow) {
-                    case '10min':
-                        startTime = new Date(now - 10 * 60 * 1000);
-                        break;
-                    case '30min':
-                        startTime = new Date(now - 30 * 60 * 1000);
-                        break;
-                    case '1hour':
-                        startTime = new Date(now - 60 * 60 * 1000);
-                        break;
-                    case '1day':
-                        startTime = new Date(now - 24 * 60 * 60 * 1000);
-                        break;
-                }
+                const startTime = new Date(now - 10 * 60 * 1000);
 
                 // Set the time range for the x-axis
                 chart.options.scales.x.min = startTime;
@@ -202,15 +151,10 @@
             }
         }
 
-        // Initialize charts with dynamic scaling for all metrics
-        const processChart = createChart(document.getElementById('processChart').getContext('2d'), 'Number of Processes');
-        const freqChart = createChart(document.getElementById('freqChart').getContext('2d'), 'Frequency (MHz)');
-        const cryptoChart = createChart(document.getElementById('cryptoChart').getContext('2d'), 'BTC/USDT $');
-
         // Fetch and update data
-        async function fetchMetrics(deviceName, metricName, timeWindow) {
+        async function fetchMetrics(deviceName, metricName) {
             try {
-                const response = await fetch(`/api/metrics/${deviceName}/${metricName}?time_range=${timeWindow}`);
+                const response = await fetch(`/api/metrics/${deviceName}/${metricName}?time_range=realtime`);
                 const data = await response.json();
                 return data;
             } catch (error) {
@@ -219,44 +163,29 @@
             }
         }
 
-        async function updateMetrics() {
-            let hasData = false;
-            
-            // Update Process Count
-            const processTimeWindow = document.getElementById('processTimeWindow').value;
-            const processData = await fetchMetrics('Device_1', 'Process_Count', processTimeWindow);
-            if (processData && processData.length > 0) {
-                updateChart(processChart, processData, processTimeWindow);
-                hasData = true;
-            }
+        async function updateAllCharts() {
+            const processCountData = await fetchMetrics('Device_1', 'Process_Count');
+            const cpuFrequencyData = await fetchMetrics('Device_1', 'CPU_Frequency');
+            const btcPriceData = await fetchMetrics('Device_2', 'BTC_Price');
 
-            // Update CPU Frequency
-            const freqTimeWindow = document.getElementById('freqTimeWindow').value;
-            const freqData = await fetchMetrics('Device_1', 'CPU_Frequency', freqTimeWindow);
-            if (freqData && freqData.length > 0) {
-                updateChart(freqChart, freqData, freqTimeWindow);
-                hasData = true;
+            if (processCountData && cpuFrequencyData && btcPriceData) {
+                updateChart(processCountChart, processCountData);
+                updateChart(cpuFrequencyChart, cpuFrequencyData);
+                updateChart(btcPriceChart, btcPriceData);
+                updateStatusIndicator(true);
+            } else {
+                updateStatusIndicator(false);
             }
-
-            // Update Bitcoin Price
-            const cryptoTimeWindow = document.getElementById('cryptoTimeWindow').value;
-            const cryptoData = await fetchMetrics('Device_2', 'BTC_Price', cryptoTimeWindow);
-            if (cryptoData && cryptoData.length > 0) {
-                updateChart(cryptoChart, cryptoData, cryptoTimeWindow);
-                hasData = true;
-            }
-
-            updateStatusIndicator(hasData);
         }
 
-        // Add event listeners for time window changes
-        document.getElementById('processTimeWindow').addEventListener('change', updateMetrics);
-        document.getElementById('freqTimeWindow').addEventListener('change', updateMetrics);
-        document.getElementById('cryptoTimeWindow').addEventListener('change', updateMetrics);
+        // Initialize charts
+        const processCountChart = createChart(document.getElementById('processCountChart').getContext('2d'));
+        const cpuFrequencyChart = createChart(document.getElementById('cpuFrequencyChart').getContext('2d'));
+        const btcPriceChart = createChart(document.getElementById('btcPriceChart').getContext('2d'));
 
-        // Update metrics every 5 seconds
-        setInterval(updateMetrics, 5000);
-        updateMetrics(); // Initial update
+        // Update charts every 5 seconds
+        updateAllCharts();
+        setInterval(updateAllCharts, 5000);
     </script>
 </body>
 </html> 
