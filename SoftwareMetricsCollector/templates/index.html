@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Monitoring Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
@@ -102,12 +103,22 @@
                         }
                     },
                     x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: {
+                                minute: 'HH:mm',
+                                hour: 'HH:mm',
+                                day: 'MMM D, HH:mm'
+                            }
+                        },
                         grid: {
                             display: false
                         },
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 45
+                            minRotation: 45,
+                            source: 'auto'
                         }
                     }
                 },
@@ -130,25 +141,50 @@
             return new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [],
                     datasets: [{
                         label: label,
                         data: [],
                         borderColor: 'rgb(75, 192, 192)',
                         backgroundColor: 'rgba(75, 192, 192, 0.1)',
                         tension: 0.4,
-                        fill: true
+                        fill: true,
+                        spanGaps: false  // Don't connect across missing data points
                     }]
                 },
                 options: mergedOptions
             });
         }
 
-        function updateChart(chart, data) {
+        function updateChart(chart, data, timeWindow) {
             if (data && data.length > 0) {
-                // Data is already in chronological order from the backend
-                chart.data.labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
-                chart.data.datasets[0].data = data.map(d => d.value);
+                // Calculate the time range based on the selected window
+                const now = new Date();
+                let startTime;
+                switch(timeWindow) {
+                    case '10min':
+                        startTime = new Date(now - 10 * 60 * 1000);
+                        break;
+                    case '30min':
+                        startTime = new Date(now - 30 * 60 * 1000);
+                        break;
+                    case '1hour':
+                        startTime = new Date(now - 60 * 60 * 1000);
+                        break;
+                    case '1day':
+                        startTime = new Date(now - 24 * 60 * 60 * 1000);
+                        break;
+                }
+
+                // Set the time range for the x-axis
+                chart.options.scales.x.min = startTime;
+                chart.options.scales.x.max = now;
+
+                // Update the data points
+                chart.data.datasets[0].data = data.map(d => ({
+                    x: new Date(d.timestamp),
+                    y: d.value
+                }));
+
                 chart.update();
             }
         }
@@ -190,7 +226,7 @@
             const processTimeWindow = document.getElementById('processTimeWindow').value;
             const processData = await fetchMetrics('Device_1', 'Process_Count', processTimeWindow);
             if (processData && processData.length > 0) {
-                updateChart(processChart, processData);
+                updateChart(processChart, processData, processTimeWindow);
                 hasData = true;
             }
 
@@ -198,7 +234,7 @@
             const freqTimeWindow = document.getElementById('freqTimeWindow').value;
             const freqData = await fetchMetrics('Device_1', 'CPU_Frequency', freqTimeWindow);
             if (freqData && freqData.length > 0) {
-                updateChart(freqChart, freqData);
+                updateChart(freqChart, freqData, freqTimeWindow);
                 hasData = true;
             }
 
@@ -206,7 +242,7 @@
             const cryptoTimeWindow = document.getElementById('cryptoTimeWindow').value;
             const cryptoData = await fetchMetrics('Device_2', 'BTC_Price', cryptoTimeWindow);
             if (cryptoData && cryptoData.length > 0) {
-                updateChart(cryptoChart, cryptoData);
+                updateChart(cryptoChart, cryptoData, cryptoTimeWindow);
                 hasData = true;
             }
 
