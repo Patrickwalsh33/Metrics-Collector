@@ -28,6 +28,7 @@ with app.app_context():
 # Global variables for collector management
 collector_process = None
 collector_status = queue.Queue()
+collector_start_time = None
 
 def find_python_executable():
     if os.name == 'nt':  # Windows
@@ -36,7 +37,7 @@ def find_python_executable():
 
 @app.route('/api/collector/start', methods=['POST'])
 def start_collector():
-    global collector_process
+    global collector_process, collector_start_time
     
     if collector_process is not None:
         return jsonify({'status': 'error', 'message': 'Collector is already running'})
@@ -44,14 +45,15 @@ def start_collector():
     try:
         python_exe = find_python_executable()
         collector_process = subprocess.Popen([python_exe, 'collector_agent.py'])
-        collector_status.put(('running', datetime.utcnow()))
+        collector_start_time = datetime.utcnow()
+        collector_status.put(('running', collector_start_time))
         return jsonify({'status': 'success', 'message': 'Collector started'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/api/collector/stop', methods=['POST'])
 def stop_collector():
-    global collector_process
+    global collector_process, collector_start_time
     
     if collector_process is None:
         return jsonify({'status': 'error', 'message': 'Collector is not running'})
@@ -64,6 +66,7 @@ def stop_collector():
         
         collector_process.wait(timeout=5)  # Wait for process to terminate
         collector_process = None
+        collector_start_time = None
         collector_status.put(('stopped', datetime.utcnow()))
         return jsonify({'status': 'success', 'message': 'Collector stopped'})
     except Exception as e:
@@ -153,7 +156,10 @@ def get_metrics(device_name, metric_name):
     
     # Calculate the time threshold based on the selected window
     now = datetime.utcnow()
-    if time_range == '10min':
+    if time_range == 'live' and collector_start_time is not None:
+        # For live mode, only get data since collector started
+        threshold = collector_start_time
+    elif time_range == '10min':
         threshold = now - timedelta(minutes=10)
     elif time_range == '30min':
         threshold = now - timedelta(minutes=30)
