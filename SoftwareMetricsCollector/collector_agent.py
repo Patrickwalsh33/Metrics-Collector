@@ -44,7 +44,7 @@ class ThirdPartyCollector:
             return None
 
 class UploaderQueue:
-    def __init__(self, api_url='http://localhost:5000/api/metrics'):
+    def __init__(self, api_url='https://patrickwalsh3333.pythonanywhere.com/api/metrics'):
         self.queue = Queue()
         self.api_url = api_url
         self.running = True
@@ -68,15 +68,21 @@ class UploaderQueue:
                 if not self.queue.empty():
                     metric_data = self.queue.get()
                     try:
-                        response = requests.post(self.api_url, json=metric_data)
+                        # Add error handling for connection issues
+                        response = requests.post(
+                            self.api_url, 
+                            json=metric_data,
+                            timeout=10  # Add timeout
+                        )
                         if response.status_code != 200:
                             print(f"Failed to upload metric: {response.text}")
-                    except requests.exceptions.ConnectionError:
-                        print("Connection to Flask server failed - ensure app.py is running")
-                        # Put the metric back in the queue
+                            # Put failed metrics back in queue
+                            self.queue.put(metric_data)
+                    except requests.exceptions.RequestException as e:
+                        print(f"Connection error: {str(e)}")
+                        # Put failed metrics back in queue
                         self.queue.put(metric_data)
-                        # Wait before retrying
-                        time.sleep(5)
+                        time.sleep(5)  # Wait before retry
                 time.sleep(0.1)
             except Exception as e:
                 print(f"Error in upload worker: {str(e)}")
