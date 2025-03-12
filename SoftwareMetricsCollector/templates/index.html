@@ -68,6 +68,15 @@
                 <canvas id="btcPriceChart"></canvas>
             </div>
         </div>
+
+        <div class="row mb-4">
+            <div class="col">
+                <button id="startCollector" class="btn btn-primary">Start Collector</button>
+                <button id="stopCollector" class="btn btn-danger" disabled>Stop Collector</button>
+                <button id="pauseCollector" class="btn btn-warning" disabled>Pause Collector</button>
+                <button id="resumeCollector" class="btn btn-success" disabled>Resume Collector</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -248,6 +257,54 @@
         // Start in live mode
         updateAllCharts('10min');
         updateInterval = setInterval(() => updateAllCharts('10min'), UPDATE_INTERVAL);
+
+        document.getElementById('pauseCollector').addEventListener('click', function() {
+            fetch('/api/collector/pause', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('pauseCollector').disabled = true;
+                    document.getElementById('resumeCollector').disabled = false;
+                });
+        });
+
+        document.getElementById('resumeCollector').addEventListener('click', function() {
+            fetch('/api/collector/resume', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('pauseCollector').disabled = false;
+                    document.getElementById('resumeCollector').disabled = true;
+                });
+        });
+
+        // Update the event source handler
+        source.addEventListener('collector_status', function(event) {
+            const data = JSON.parse(event.data);
+            if (data.status === 'running') {
+                document.getElementById('startCollector').disabled = true;
+                document.getElementById('stopCollector').disabled = false;
+                document.getElementById('pauseCollector').disabled = false;
+                document.getElementById('resumeCollector').disabled = true;
+                if (!updateInterval) {
+                    clearAllCharts();
+                    setTimeout(() => {
+                        updateAllCharts('live');
+                        updateInterval = setInterval(() => updateAllCharts('live'), 5000);
+                    }, 1000);
+                }
+            } else if (data.status === 'paused') {
+                document.getElementById('pauseCollector').disabled = true;
+                document.getElementById('resumeCollector').disabled = false;
+            } else {
+                document.getElementById('startCollector').disabled = false;
+                document.getElementById('stopCollector').disabled = true;
+                document.getElementById('pauseCollector').disabled = true;
+                document.getElementById('resumeCollector').disabled = true;
+                if (updateInterval) {
+                    clearInterval(updateInterval);
+                    updateInterval = null;
+                }
+            }
+        });
     </script>
 </body>
 </html> 

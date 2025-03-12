@@ -6,6 +6,23 @@ import json
 import threading
 from queue import Queue
 
+class CollectorStatus:
+    def __init__(self, status_url='https://patrickwalsh3333.pythonanywhere.com/api/collector/status'):
+        self.status_url = status_url
+        self.should_run = True
+        self.check_interval = 5  # Check status every 5 seconds
+
+    def check_status(self):
+        try:
+            response = requests.get(self.status_url)
+            if response.status_code == 200:
+                status_data = response.json()
+                return status_data.get('should_run', True)
+            return True  # Default to running if can't reach server
+        except Exception as e:
+            print(f"Error checking status: {str(e)}")
+            return True  # Default to running if can't reach server
+
 class PCCollector:
     def get_process_count(self):
         return len(psutil.pids())
@@ -90,6 +107,7 @@ class UploaderQueue:
 
 def main():
     print("Starting collectors...")
+    collector_status = CollectorStatus()
     pc_collector = PCCollector()
     third_party_collector = ThirdPartyCollector()
     uploader = UploaderQueue()
@@ -97,20 +115,24 @@ def main():
     print("Collecting metrics. Press Ctrl+C to stop.")
     try:
         while True:
-            # Collect PC metrics
-            process_count = pc_collector.get_process_count()
-            cpu_freq = pc_collector.get_cpu_frequency()
+            # Check if we should be running
+            if collector_status.check_status():
+                # Collect PC metrics
+                process_count = pc_collector.get_process_count()
+                cpu_freq = pc_collector.get_cpu_frequency()
+                
+                # Collect third-party metric (BTC price)
+                crypto_price = third_party_collector.get_crypto_price()
+
+                # Upload metrics
+                uploader.add_metric('Device_1', 'Process_Count', process_count)
+                if cpu_freq is not None:
+                    uploader.add_metric('Device_1', 'CPU_Frequency', cpu_freq)
+                if crypto_price:
+                    uploader.add_metric('Device_2', 'BTC_Price', crypto_price)
+            else:
+                print("Collector paused...")
             
-            # Collect third-party metric (BTC price)
-            crypto_price = third_party_collector.get_crypto_price()
-
-            # Upload metrics
-            uploader.add_metric('Device_1', 'Process_Count', process_count)
-            if cpu_freq is not None:
-                uploader.add_metric('Device_1', 'CPU_Frequency', cpu_freq)
-            if crypto_price:
-                uploader.add_metric('Device_2', 'BTC_Price', crypto_price)
-
             time.sleep(5)  # Collect metrics every 5 seconds
     except KeyboardInterrupt:
         print("\nStopping collectors...")
