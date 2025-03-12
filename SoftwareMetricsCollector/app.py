@@ -23,9 +23,6 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-# Global variables for collector state
-collector_running = False
-collector_paused = False
 
 # Aggregator API endpoint
 @app.route('/api/metrics', methods=['POST'])
@@ -168,46 +165,6 @@ def debug_metrics(device_name, metric_name):
     except Exception as e:
         print(f"Error in debug_metrics: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/api/collector/status', methods=['GET'])
-def get_collector_status():
-    """Get the current status of the collector"""
-    return jsonify({
-        'status': 'running' if collector_running else 'stopped',
-        'should_run': not collector_paused and collector_running
-    })
-
-@app.route('/api/collector/start', methods=['POST'])
-def start_collector():
-    """Start the collector"""
-    global collector_running, collector_paused, collector_start_time
-    collector_running = True
-    collector_paused = False
-    collector_start_time = datetime.now(timezone.utc)
-    return jsonify({'status': 'running'})
-
-@app.route('/api/collector/stop', methods=['POST'])
-def stop_collector():
-    """Stop the collector"""
-    global collector_running, collector_paused, collector_start_time
-    collector_running = False
-    collector_paused = False
-    collector_start_time = None
-    return jsonify({'status': 'stopped'})
-
-@app.route('/api/collector/pause', methods=['POST'])
-def pause_collector():
-    """Pause the collector"""
-    global collector_paused
-    collector_paused = True
-    return jsonify({'status': 'paused'})
-
-@app.route('/api/collector/resume', methods=['POST'])
-def resume_collector():
-    """Resume the collector"""
-    global collector_paused
-    collector_paused = False
-    return jsonify({'status': 'running'})
 
 if __name__ == '__main__':
     app.run() 
