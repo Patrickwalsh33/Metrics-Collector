@@ -1,7 +1,7 @@
 import psutil
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import threading
 from queue import Queue
@@ -58,7 +58,7 @@ class UploaderQueue:
                 'device_name': device_name,
                 'metric_name': metric_name,
                 'value': value,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
             self.queue.put(metric_data)
 

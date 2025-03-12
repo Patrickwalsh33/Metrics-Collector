@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template, Response
 from flask_cors import CORS
 from models import db, Device, Metric, MetricData
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 app = Flask(__name__)
@@ -48,11 +48,13 @@ def add_metric():
             db.session.add(metric)
             db.session.flush()
         
-        # Create new metric data
+        # Create new metric data with proper UTC timestamp
+        timestamp = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
         new_metric_data = MetricData(
             metricID=metric.id,
             deviceId=device.id,
-            value=data['value']
+            value=data['value'],
+            timestamp=timestamp
         )
         db.session.add(new_metric_data)
         db.session.commit()
@@ -68,12 +70,8 @@ def get_metrics(device_name, metric_name):
     limit = int(request.args.get('limit', 100))
     
     try:
-        query = MetricData.query.join(Device).join(Metric).filter(
-            Device.name == device_name,
-            Metric.name == metric_name
-        )
-        
-        now = datetime.utcnow()
+        # Calculate the time threshold using UTC
+        now = datetime.now(timezone.utc)
         if time_range == '10min':
             threshold = now - timedelta(minutes=10)
         elif time_range == '1hour':
@@ -83,17 +81,89 @@ def get_metrics(device_name, metric_name):
         else:
             threshold = now - timedelta(minutes=10)
         
-        metrics = query.filter(
-            MetricData.timestamp >= threshold
-        ).order_by(MetricData.timestamp.asc()).limit(limit).all()
+        print(f"Time range: {time_range}")
+        print(f"Current time (UTC): {now}")
+        print(f"Threshold time (UTC): {threshold}")
         
-        return jsonify([metric.to_dict() for metric in metrics])
+        # Build the query with explicit timestamp conversion
+        query = MetricData.query.join(Device).join(Metric).filter(
+            Device.name == device_name,
+            Metric.name == metric_name,
+            MetricData.timestamp >= threshold
+        ).order_by(MetricData.timestamp.asc())
+        
+        # Get the metrics
+        metrics = query.limit(limit).all()
+        
+        # Convert to dict with proper UTC timestamp formatting
+        result = []
+        for metric in metrics:
+            # Ensure the timestamp is UTC aware
+            if metric.timestamp.tzinfo is None:
+                timestamp = metric.timestamp.replace(tzinfo=timezone.utc)
+            else:
+                timestamp = metric.timestamp
+                
+            metric_dict = {
+                'timestamp': timestamp.isoformat(),
+                'value': metric.value
+            }
+            result.append(metric_dict)
+        
+        print(f"Number of records found: {len(result)}")
+        if result:
+            print(f"First record time: {result[0]['timestamp']}")
+            print(f"Last record time: {result[-1]['timestamp']}")
+        
+        return jsonify(result)
     except Exception as e:
+        print(f"Error in get_metrics: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# Add this new endpoint after your existing endpoints
+@app.route('/api/debug/metrics/<device_name>/<metric_name>')
+def debug_metrics(device_name, metric_name):
+    try:
+        # Get all metrics for this device and metric type
+        query = MetricData.query.join(Device).join(Metric).filter(
+            Device.name == device_name,
+            Metric.name == metric_name
+        ).order_by(MetricData.timestamp.desc())
+        
+        metrics = query.limit(10).all()  # Get last 10 records
+        
+        # Get count of all records
+        total_count = query.count()
+        
+        # Get time range of data
+        oldest = MetricData.query.join(Device).join(Metric).filter(
+            Device.name == device_name,
+            Metric.name == metric_name
+        ).order_by(MetricData.timestamp.asc()).first()
+        
+        newest = MetricData.query.join(Device).join(Metric).filter(
+            Device.name == device_name,
+            Metric.name == metric_name
+        ).order_by(MetricData.timestamp.desc()).first()
+        
+        return jsonify({
+            'total_records': total_count,
+            'oldest_record_time': oldest.timestamp.isoformat() if oldest else None,
+            'newest_record_time': newest.timestamp.isoformat() if newest else None,
+            'last_10_records': [
+                {
+                    'timestamp': m.timestamp.isoformat(),
+                    'value': m.value
+                } for m in metrics
+            ]
+        })
+    except Exception as e:
+        print(f"Error in debug_metrics: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run() 

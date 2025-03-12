@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 
 db = SQLAlchemy()
 
@@ -21,14 +21,20 @@ class MetricData(db.Model):
     metricID = db.Column(db.Integer, db.ForeignKey('metrics.id'), nullable=False)
     value = db.Column(db.Float, nullable=False)
     deviceId = db.Column(db.Integer, db.ForeignKey('device.id'), nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
+        # Ensure timestamp is UTC aware
+        if self.timestamp.tzinfo is None:
+            timestamp = self.timestamp.replace(tzinfo=timezone.utc)
+        else:
+            timestamp = self.timestamp
+
         return {
             'id': self.id,
             'device_name': self.device.name,
             'metric_name': self.metric.name,
             'value': self.value,
             'unit': self.metric.unit,
-            'timestamp': self.timestamp.isoformat()
+            'timestamp': timestamp.isoformat()
         } 
